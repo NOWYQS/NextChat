@@ -237,6 +237,9 @@ export function getMessageTextContent(message: RequestMessage) {
   if (typeof message.content === "string") {
     return message.content;
   }
+  if (!Array.isArray(message.content)) {
+    return "";
+  }
   for (const c of message.content) {
     if (c.type === "text") {
       return c.text ?? "";
@@ -250,7 +253,7 @@ export function getMessageTextContentWithoutThinking(message: RequestMessage) {
 
   if (typeof message.content === "string") {
     content = message.content;
-  } else {
+  } else if (Array.isArray(message.content)) {
     for (const c of message.content) {
       if (c.type === "text") {
         content = c.text ?? "";
@@ -268,7 +271,7 @@ export function getMessageTextContentWithoutThinking(message: RequestMessage) {
 }
 
 export function getMessageImages(message: RequestMessage): string[] {
-  if (typeof message.content === "string") {
+  if (!Array.isArray(message.content)) {
     return [];
   }
   const urls: string[] = [];
