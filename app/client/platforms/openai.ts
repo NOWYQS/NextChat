@@ -7,6 +7,7 @@ import {
   OpenaiPath,
   Azure,
   REQUEST_TIMEOUT_MS,
+  REQUEST_TIMEOUT_MS_FOR_THINKING,
   ServiceProvider,
 } from "@/app/constant";
 import {
@@ -537,10 +538,14 @@ export class ChatGPTApi implements LLMApi {
           headers: getHeaders(),
         };
 
-        // make a fetch request
+        // Image generation/editing can legitimately outlast the normal chat timeout.
+        // Reuse the existing long-running request budget (five minutes).
+        const requestTimeoutMs = isImageRequest
+          ? REQUEST_TIMEOUT_MS_FOR_THINKING
+          : getTimeoutMSByModel(options.config.model);
         const requestTimeoutId = setTimeout(
           () => controller.abort(),
-          getTimeoutMSByModel(options.config.model),
+          requestTimeoutMs,
         );
 
         const res = await fetch(chatPath, chatPayload);
