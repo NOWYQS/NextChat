@@ -17,11 +17,6 @@ import {
 import { createPersistStore } from "../utils/store";
 import type { Voice } from "rt-client";
 import { normalizeReasoningEffort, ReasoningEffort } from "../utils/reasoning";
-import {
-  type AutoImageAspectRatio,
-  type AutoImageResolution,
-  type AutoImageSizeMode,
-} from "../utils/image-generation";
 
 export type ModelType = (typeof DEFAULT_MODELS)[number]["name"];
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
@@ -76,13 +71,6 @@ export const DEFAULT_CONFIG = {
     top_p: 1,
     reasoning_effort: "medium" as ReasoningEffort,
     enableImageGeneration: true,
-    imageResolution: "2k" as AutoImageResolution,
-    imageSizeMode: "preset" as AutoImageSizeMode,
-    imageAspectRatio: "16:9" as AutoImageAspectRatio,
-    imageCustomAspectWidth: 1,
-    imageCustomAspectHeight: 1,
-    imageCustomWidth: 2048,
-    imageCustomHeight: 1152,
     max_tokens: 4000,
     presence_penalty: 0,
     frequency_penalty: 0,
@@ -213,7 +201,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.5,
+    version: 4.3,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -281,26 +269,6 @@ export const useAppConfig = createPersistStore(
       if (version < 4.3) {
         state.modelConfig.enableImageGeneration =
           DEFAULT_CONFIG.modelConfig.enableImageGeneration;
-      }
-
-      if (version < 4.4) {
-        state.modelConfig.imageResolution =
-          DEFAULT_CONFIG.modelConfig.imageResolution;
-      }
-
-      if (version < 4.5) {
-        state.modelConfig.imageSizeMode =
-          DEFAULT_CONFIG.modelConfig.imageSizeMode;
-        state.modelConfig.imageAspectRatio =
-          DEFAULT_CONFIG.modelConfig.imageAspectRatio;
-        state.modelConfig.imageCustomAspectWidth =
-          DEFAULT_CONFIG.modelConfig.imageCustomAspectWidth;
-        state.modelConfig.imageCustomAspectHeight =
-          DEFAULT_CONFIG.modelConfig.imageCustomAspectHeight;
-        state.modelConfig.imageCustomWidth =
-          DEFAULT_CONFIG.modelConfig.imageCustomWidth;
-        state.modelConfig.imageCustomHeight =
-          DEFAULT_CONFIG.modelConfig.imageCustomHeight;
       }
 
       return state as any;
