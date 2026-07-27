@@ -82,9 +82,19 @@ const en: LocaleType = {
       Clear: "Clear Context",
       Settings: "Settings",
       UploadImage: "Upload Images",
+      Model: "Model",
+      ReasoningEffort: "Thinking",
+      EnableImageGeneration: "Enable image generation",
+      NotApplicable: "N/A",
     },
     Rename: "Rename Chat",
     Typing: "Typing…",
+    Reasoning: {
+      Thinking: "Thinking…",
+      Done: "Thought process complete",
+      Expand: "Expand thought process",
+      Collapse: "Collapse thought process",
+    },
     Input: (submitKey: string) => {
       var inputHints = `${submitKey} to send`;
       if (submitKey === String(SubmitKey.Enter)) {
@@ -568,6 +578,15 @@ const en: LocaleType = {
     TopP: {
       Title: "Top P",
       SubTitle: "Do not alter this value together with temperature",
+    },
+    ReasoningEffort: {
+      Title: "Reasoning Effort",
+      SubTitle: "Controls how much effort reasoning models spend",
+      Low: "Low",
+      Medium: "Medium",
+      High: "High",
+      ExtraHigh: "Extra High",
+      Maximum: "Maximum",
     },
     MaxTokens: {
       Title: "Max Tokens",

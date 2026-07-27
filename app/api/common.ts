@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSideConfig } from "../config/server";
 import { OPENAI_BASE_URL, ServiceProvider } from "../constant";
 import { cloudflareAIGatewayUrl } from "../utils/cloudflare";
+import { isAutoImageEndpointRequest } from "../utils/image-generation";
 import { getModelProvider, isModelNotavailableInServer } from "../utils/model";
 
 const serverConfig = getServerSideConfig();
@@ -90,9 +91,10 @@ export async function requestOpenai(req: NextRequest) {
 
   const fetchUrl = cloudflareAIGatewayUrl(`${baseUrl}/${path}`);
   console.log("fetchUrl", fetchUrl);
+  const contentType = req.headers.get("Content-Type") ?? "application/json";
   const fetchOptions: RequestInit = {
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": contentType,
       "Cache-Control": "no-store",
       [authHeaderName]: authValue,
       ...(serverConfig.openaiOrgId && {
@@ -109,7 +111,11 @@ export async function requestOpenai(req: NextRequest) {
   };
 
   // #1815 try to refuse gpt4 request
-  if (serverConfig.customModels && req.body) {
+  if (
+    serverConfig.customModels &&
+    req.body &&
+    contentType.toLowerCase().includes("application/json")
+  ) {
     try {
       const clonedBody = await req.text();
       fetchOptions.body = clonedBody;
@@ -118,6 +124,7 @@ export async function requestOpenai(req: NextRequest) {
 
       // not undefined and is false
       if (
+        !isAutoImageEndpointRequest(path, jsonBody?.model) &&
         isModelNotavailableInServer(
           serverConfig.customModels,
           jsonBody?.model as string,

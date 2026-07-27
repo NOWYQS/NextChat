@@ -16,6 +16,7 @@ import {
 } from "../constant";
 import { createPersistStore } from "../utils/store";
 import type { Voice } from "rt-client";
+import { normalizeReasoningEffort, ReasoningEffort } from "../utils/reasoning";
 
 export type ModelType = (typeof DEFAULT_MODELS)[number]["name"];
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
@@ -68,6 +69,8 @@ export const DEFAULT_CONFIG = {
     providerName: "OpenAI" as ServiceProvider,
     temperature: 0.5,
     top_p: 1,
+    reasoning_effort: "medium" as ReasoningEffort,
+    enableImageGeneration: true,
     max_tokens: 4000,
     presence_penalty: 0,
     frequency_penalty: 0,
@@ -159,6 +162,9 @@ export const ModalConfigValidator = {
   top_p(x: number) {
     return limitNumber(x, 0, 1, 1);
   },
+  reasoning_effort(x: string) {
+    return normalizeReasoningEffort(x);
+  },
 };
 
 export const useAppConfig = createPersistStore(
@@ -195,7 +201,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.1,
+    version: 4.3,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -253,6 +259,16 @@ export const useAppConfig = createPersistStore(
           DEFAULT_CONFIG.modelConfig.compressModel;
         state.modelConfig.compressProviderName =
           DEFAULT_CONFIG.modelConfig.compressProviderName;
+      }
+
+      if (version < 4.2) {
+        state.modelConfig.reasoning_effort =
+          DEFAULT_CONFIG.modelConfig.reasoning_effort;
+      }
+
+      if (version < 4.3) {
+        state.modelConfig.enableImageGeneration =
+          DEFAULT_CONFIG.modelConfig.enableImageGeneration;
       }
 
       return state as any;

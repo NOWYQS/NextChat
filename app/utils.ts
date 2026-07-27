@@ -292,6 +292,10 @@ export function isVisionModel(model: string) {
   );
 }
 
+export function supportsReasoningEffort(model: string) {
+  return /^(?:gpt-5(?:[.-]|$)|o[134](?:[.-]|$))/i.test(model);
+}
+
 export function isDalle3(model: string) {
   return "dall-e-3" === model;
 }

@@ -11,6 +11,7 @@ import {
 } from "@fortaine/fetch-event-source";
 import { prettyObject } from "./format";
 import { fetch as tauriFetch } from "./stream";
+import { REASONING_END_MARKER, REASONING_START_MARKER } from "./reasoning";
 
 export function compressImage(file: Blob, maxSize: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -624,25 +625,17 @@ export function streamWithThink(
             if (!isInThinkingMode || isThinkingChanged) {
               // If this is a new thinking block or mode changed, add prefix
               isInThinkingMode = true;
-              if (remainText.length > 0) {
-                remainText += "\n";
-              }
-              remainText += "> " + chunk.content;
+              if (remainText.length > 0) remainText += "\n";
+              remainText += `${REASONING_START_MARKER}\n${chunk.content}`;
             } else {
-              // Handle newlines in thinking content
-              if (chunk.content.includes("\n\n")) {
-                const lines = chunk.content.split("\n\n");
-                remainText += lines.join("\n\n> ");
-              } else {
-                remainText += chunk.content;
-              }
+              remainText += chunk.content;
             }
           } else {
             // If in normal mode
             if (isInThinkingMode || isThinkingChanged) {
               // If switching from thinking mode to normal mode
               isInThinkingMode = false;
-              remainText += "\n\n" + chunk.content;
+              remainText += `\n${REASONING_END_MARKER}\n${chunk.content}`;
             } else {
               remainText += chunk.content;
             }

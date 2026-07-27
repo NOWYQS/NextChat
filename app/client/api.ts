@@ -62,6 +62,7 @@ export interface LLMConfig {
   size?: DalleRequestPayload["size"];
   quality?: DalleRequestPayload["quality"];
   style?: DalleRequestPayload["style"];
+  enableImageGeneration?: boolean;
 }
 
 export interface SpeechOptions {

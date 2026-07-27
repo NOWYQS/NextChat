@@ -72,6 +72,7 @@ import {
   safeLocalStorage,
   getModelSizes,
   supportsCustomSize,
+  supportsReasoningEffort,
   useMobileScreen,
   selectOrCopy,
   showPlugins,
@@ -125,6 +126,7 @@ import { getModelProvider } from "../utils/model";
 import { RealtimeChat } from "@/app/components/realtime-chat";
 import clsx from "clsx";
 import { getAvailableClientsCount, isMcpEnabled } from "../mcp/actions";
+import { splitReasoningContent } from "../utils/reasoning";
 
 const localStorage = safeLocalStorage();
 
@@ -133,6 +135,123 @@ const ttsPlayer = createTTSPlayer();
 const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
   loading: () => <LoadingIcon />,
 });
+
+function ReasoningMessage(props: {
+  content: string;
+  streaming: boolean;
+  loading: boolean;
+  fontSize: number;
+  fontFamily: string;
+  parentRef: RefObject<HTMLDivElement>;
+  defaultShow: boolean;
+  onDoubleClickCapture: () => void;
+}) {
+  const parts = useMemo(
+    () => splitReasoningContent(props.content),
+    [props.content],
+  );
+  const [expanded, setExpanded] = useState(
+    props.streaming && parts.hasReasoning && !parts.hasAnswer,
+  );
+  const hadAnswer = useRef(parts.hasAnswer);
+
+  useEffect(() => {
+    if (!parts.hasReasoning) return;
+    if (props.streaming && !parts.hasAnswer && !hadAnswer.current) {
+      setExpanded(true);
+    }
+    if (!hadAnswer.current && parts.hasAnswer) {
+      setExpanded(false);
+    }
+    if (!props.streaming && !parts.hasAnswer) {
+      setExpanded(false);
+    }
+    hadAnswer.current = parts.hasAnswer;
+  }, [parts.hasAnswer, parts.hasReasoning, props.streaming]);
+
+  if (!parts.hasReasoning) {
+    return (
+      <Markdown
+        content={props.content}
+        loading={props.loading}
+        onDoubleClickCapture={props.onDoubleClickCapture}
+        fontSize={props.fontSize}
+        fontFamily={props.fontFamily}
+        parentRef={props.parentRef}
+        defaultShow={props.defaultShow}
+      />
+    );
+  }
+
+  const thinking = props.streaming && !parts.hasAnswer;
+  const status = thinking
+    ? Locale.Chat.Reasoning.Thinking
+    : Locale.Chat.Reasoning.Done;
+
+  return (
+    <div onDoubleClickCapture={props.onDoubleClickCapture}>
+      <div
+        className={clsx(
+          styles["reasoning-panel"],
+          thinking && styles["reasoning-panel-active"],
+        )}
+        data-testid="reasoning-panel"
+      >
+        <button
+          type="button"
+          className={styles["reasoning-header"]}
+          aria-expanded={expanded}
+          aria-label={
+            expanded
+              ? Locale.Chat.Reasoning.Collapse
+              : Locale.Chat.Reasoning.Expand
+          }
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span className={styles["reasoning-icon"]} aria-hidden="true">
+            <BrainIcon />
+          </span>
+          <span className={styles["reasoning-status"]}>{status}</span>
+          {thinking && (
+            <span className={styles["reasoning-pulse"]} aria-hidden="true" />
+          )}
+          <span
+            className={clsx(
+              styles["reasoning-chevron"],
+              expanded && styles["reasoning-chevron-expanded"],
+            )}
+            aria-hidden="true"
+          >
+            ▾
+          </span>
+        </button>
+        {expanded && (
+          <div
+            className={styles["reasoning-content"]}
+            data-testid="reasoning-content"
+          >
+            <Markdown
+              content={parts.reasoning}
+              fontSize={Math.max(props.fontSize - 1, 12)}
+              fontFamily={props.fontFamily}
+              parentRef={props.parentRef}
+              defaultShow={props.defaultShow}
+            />
+          </div>
+        )}
+      </div>
+      {parts.hasAnswer && (
+        <Markdown
+          content={parts.answer}
+          fontSize={props.fontSize}
+          fontFamily={props.fontFamily}
+          parentRef={props.parentRef}
+          defaultShow={props.defaultShow}
+        />
+      )}
+    </div>
+  );
+}
 
 const MCPAction = () => {
   const navigate = useNavigate();
@@ -552,7 +671,8 @@ export function ChatActions(props: {
     );
     return model?.displayName ?? "";
   }, [models, currentModel, currentProviderName]);
-  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showModelControl, setShowModelControl] = useState(false);
+  const [showReasoningControl, setShowReasoningControl] = useState(false);
   const [showPluginSelector, setShowPluginSelector] = useState(false);
   const [showUploadImage, setShowUploadImage] = useState(false);
 
@@ -673,46 +793,6 @@ export function ChatActions(props: {
           }}
         />
 
-        <ChatAction
-          onClick={() => setShowModelSelector(true)}
-          text={currentModelName}
-          icon={<RobotIcon />}
-        />
-
-        {showModelSelector && (
-          <Selector
-            defaultSelectedValue={`${currentModel}@${currentProviderName}`}
-            items={models.map((m) => ({
-              title: `${m.displayName}${
-                m?.provider?.providerName
-                  ? " (" + m?.provider?.providerName + ")"
-                  : ""
-              }`,
-              value: `${m.name}@${m?.provider?.providerName}`,
-            }))}
-            onClose={() => setShowModelSelector(false)}
-            onSelection={(s) => {
-              if (s.length === 0) return;
-              const [model, providerName] = getModelProvider(s[0]);
-              chatStore.updateTargetSession(session, (session) => {
-                session.mask.modelConfig.model = model as ModelType;
-                session.mask.modelConfig.providerName =
-                  providerName as ServiceProvider;
-                session.mask.syncGlobalConfig = false;
-              });
-              if (providerName == "ByteDance") {
-                const selectedModel = models.find(
-                  (m) =>
-                    m.name == model &&
-                    m?.provider?.providerName == providerName,
-                );
-                showToast(selectedModel?.displayName ?? "");
-              } else {
-                showToast(model);
-              }
-            }}
-          />
-        )}
 
         {supportsCustomSize(currentModel) && (
           <ChatAction
@@ -835,6 +915,120 @@ export function ChatActions(props: {
         {!isMobileScreen && <MCPAction />}
       </>
       <div className={styles["chat-input-actions-end"]}>
+        <div className={styles["chat-input-control"]}>
+          <button
+            type="button"
+            className={styles["chat-input-control-button"]}
+            aria-expanded={showModelControl}
+            onClick={() => {
+              setShowModelControl((value) => !value);
+              setShowReasoningControl(false);
+            }}
+          >
+            <RobotIcon />
+            <span>{Locale.Chat.InputActions.Model}</span>
+            <strong>{currentModelName || currentModel}</strong>
+            <span aria-hidden="true">▾</span>
+          </button>
+          {showModelControl && (
+            <div className={styles["chat-input-control-panel"]}>
+              <label>
+                <span>{Locale.Chat.InputActions.Model}</span>
+                <select
+                  value={`${currentModel}@${currentProviderName}`}
+                  onChange={(event) => {
+                    const [model, providerName] = getModelProvider(
+                      event.currentTarget.value,
+                    );
+                    chatStore.updateTargetSession(session, (session) => {
+                      session.mask.modelConfig.model = model as ModelType;
+                      session.mask.modelConfig.providerName =
+                        providerName as ServiceProvider;
+                      session.mask.syncGlobalConfig = false;
+                    });
+                    setShowModelControl(false);
+                    showToast(model);
+                  }}
+                >
+                  {models.map((model) => (
+                    <option
+                      key={`${model.name}@${model.provider?.providerName}`}
+                      value={`${model.name}@${model.provider?.providerName}`}
+                    >
+                      {model.displayName || model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles["chat-input-control-check"]}>
+                <input
+                  type="checkbox"
+                  checked={session.mask.modelConfig.enableImageGeneration !== false}
+                  onChange={(event) => {
+                    chatStore.updateTargetSession(session, (session) => {
+                      session.mask.modelConfig.enableImageGeneration =
+                        event.currentTarget.checked;
+                      session.mask.syncGlobalConfig = false;
+                    });
+                  }}
+                />
+                <span>{Locale.Chat.InputActions.EnableImageGeneration}</span>
+              </label>
+            </div>
+          )}
+        </div>
+        <div className={styles["chat-input-control"]}>
+          <button
+            type="button"
+            className={styles["chat-input-control-button"]}
+            aria-expanded={showReasoningControl}
+            disabled={!supportsReasoningEffort(currentModel)}
+            onClick={() => {
+              if (!supportsReasoningEffort(currentModel)) return;
+              setShowReasoningControl((value) => !value);
+              setShowModelControl(false);
+            }}
+          >
+            <BrainIcon />
+            <span>{Locale.Chat.InputActions.ReasoningEffort}</span>
+            <strong>
+              {supportsReasoningEffort(currentModel)
+                ? session.mask.modelConfig.reasoning_effort ?? "medium"
+                : Locale.Chat.InputActions.NotApplicable}
+            </strong>
+            <span aria-hidden="true">▾</span>
+          </button>
+          {showReasoningControl && supportsReasoningEffort(currentModel) && (
+            <div className={styles["chat-input-control-panel"]}>
+              <label>
+                <span>{Locale.Chat.InputActions.ReasoningEffort}</span>
+                <select
+                  value={session.mask.modelConfig.reasoning_effort ?? "medium"}
+                  onChange={(event) => {
+                    chatStore.updateTargetSession(session, (session) => {
+                      session.mask.modelConfig.reasoning_effort =
+                        event.currentTarget.value as any;
+                      session.mask.syncGlobalConfig = false;
+                    });
+                    setShowReasoningControl(false);
+                  }}
+                >
+                  <option value="low">{Locale.Settings.ReasoningEffort.Low}</option>
+                  <option value="medium">
+                    {Locale.Settings.ReasoningEffort.Medium}
+                  </option>
+                  <option value="high">{Locale.Settings.ReasoningEffort.High}</option>
+                  <option value="xhigh">
+                    {Locale.Settings.ReasoningEffort.ExtraHigh}
+                  </option>
+                  <option value="max">
+                    {Locale.Settings.ReasoningEffort.Maximum}
+                  </option>
+                </select>
+              </label>
+            </div>
+          )}
+        </div>
         {config.realtimeConfig.enable && (
           <ChatAction
             onClick={() => props.setShowChatSidePanel(true)}
@@ -1967,14 +2161,14 @@ function _Chat() {
                             </div>
                           )}
                           <div className={styles["chat-message-item"]}>
-                            <Markdown
-                              key={message.streaming ? "loading" : "done"}
+                            <ReasoningMessage
                               content={getMessageTextContent(message)}
-                              loading={
+                              streaming={Boolean(message.streaming)}
+                              loading={Boolean(
                                 (message.preview || message.streaming) &&
-                                message.content.length === 0 &&
-                                !isUser
-                              }
+                                  message.content.length === 0 &&
+                                  !isUser,
+                              )}
                               //   onContextMenu={(e) => onRightClick(e, message)} // hard to use
                               onDoubleClickCapture={() => {
                                 if (!isMobileScreen) return;

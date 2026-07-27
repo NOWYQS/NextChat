@@ -81,9 +81,19 @@ const cn = {
       Clear: "清除聊天",
       Settings: "对话设置",
       UploadImage: "上传图片",
+      Model: "模型",
+      ReasoningEffort: "思考",
+      EnableImageGeneration: "启用图片生成",
+      NotApplicable: "不适用",
     },
     Rename: "重命名对话",
     Typing: "正在输入…",
+    Reasoning: {
+      Thinking: "思考中…",
+      Done: "已完成思考",
+      Expand: "展开思考过程",
+      Collapse: "收起思考过程",
+    },
     Input: (submitKey: string) => {
       var inputHints = `${submitKey} 发送`;
       if (submitKey === String(SubmitKey.Enter)) {
@@ -563,6 +573,15 @@ const cn = {
     TopP: {
       Title: "核采样 (top_p)",
       SubTitle: "与随机性类似，但不要和随机性一起更改",
+    },
+    ReasoningEffort: {
+      Title: "思考强度 (reasoning_effort)",
+      SubTitle: "控制推理模型投入的思考量",
+      Low: "低",
+      Medium: "中",
+      High: "高",
+      ExtraHigh: "超高",
+      Maximum: "最大",
     },
     MaxTokens: {
       Title: "单次回复限制 (max_tokens)",

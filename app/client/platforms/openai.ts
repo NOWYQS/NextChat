@@ -23,6 +23,12 @@ import {
   base64Image2Blob,
   streamWithThink,
 } from "@/app/utils/chat";
+import {
+  AUTO_IMAGE_MODEL,
+  isImageIntentCandidate,
+  parseImageIntent,
+  type ImageIntent,
+} from "@/app/utils/image-generation";
 import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
 import { ModelSize, DalleQuality, DalleStyle } from "@/app/typing";
 
@@ -39,11 +45,14 @@ import Locale from "../../locales";
 import { getClientConfig } from "@/app/config/client";
 import {
   getMessageTextContent,
+  getMessageImages,
   isVisionModel,
+  supportsReasoningEffort,
   isDalle3 as _isDalle3,
   getTimeoutMSByModel,
 } from "@/app/utils";
 import { fetch } from "@/app/utils/stream";
+import { ReasoningEffort } from "@/app/utils/reasoning";
 
 export interface OpenAIListModelResponse {
   object: string;
@@ -67,6 +76,7 @@ export interface RequestPayload {
   top_p: number;
   max_tokens?: number;
   max_completion_tokens?: number;
+  reasoning_effort?: ReasoningEffort;
 }
 
 export interface DalleRequestPayload {
@@ -145,6 +155,68 @@ export class ChatGPTApi implements LLMApi {
     return res.choices?.at(0)?.message?.content ?? res;
   }
 
+  private getLatestImageUrl(messages: ChatOptions["messages"]): string {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const images = getMessageImages(messages[i]);
+      if (images.length > 0 && images[0]) return images[0];
+    }
+    return "";
+  }
+
+  private async detectImageIntent(
+    options: ChatOptions,
+    modelConfig: any,
+    sourceImageUrl: string,
+  ): Promise<ImageIntent> {
+    if (modelConfig.enableImageGeneration === false) return "chat";
+
+    const latestUserMessage = [...options.messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    const latestUserText = latestUserMessage
+      ? getMessageTextContent(latestUserMessage)
+      : "";
+    if (!isImageIntentCandidate(latestUserText, Boolean(sourceImageUrl))) {
+      return "chat";
+    }
+
+    const context = options.messages.slice(-6).map((message) => ({
+      role: message.role,
+      content: getMessageTextContent(message),
+    }));
+    const classifierModel =
+      modelConfig.model === AUTO_IMAGE_MODEL
+        ? "gpt-5.6-terra"
+        : modelConfig.model;
+
+    try {
+      const response = await fetch(this.path(OpenaiPath.ChatPath), {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          model: classifierModel,
+          stream: false,
+          temperature: 0,
+          max_completion_tokens: 16,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Classify the user's latest request in this chat. Reply with exactly one word: generate (create a new image), edit (modify an attached or previously generated image), or chat (everything else). Do not explain.",
+            },
+            ...context,
+          ],
+        }),
+      });
+      if (!response.ok) return "chat";
+      const payload = await response.json();
+      return parseImageIntent(payload?.choices?.[0]?.message?.content);
+    } catch (error) {
+      console.warn("[Image Generation] intent classifier unavailable", error);
+      return "chat";
+    }
+  }
+
   async speech(options: SpeechOptions): Promise<ArrayBuffer> {
     const requestPayload = {
       model: options.model,
@@ -195,25 +267,69 @@ export class ChatGPTApi implements LLMApi {
 
     let requestPayload: RequestPayload | DalleRequestPayload;
 
+    const sourceImageUrl = this.getLatestImageUrl(options.messages);
+    const imageIntent = await this.detectImageIntent(
+      options,
+      modelConfig,
+      sourceImageUrl,
+    );
+    const isAutoImageRequest = imageIntent !== "chat";
     const isDalle3 = _isDalle3(options.config.model);
+    const isImageRequest = isDalle3 || isAutoImageRequest;
+    const imageModel = isAutoImageRequest
+      ? AUTO_IMAGE_MODEL
+      : options.config.model;
+    const isImageEdit = isAutoImageRequest && imageIntent === "edit";
+    let imageEditBody: FormData | undefined;
     const isO1OrO3 =
       options.config.model.startsWith("o1") ||
       options.config.model.startsWith("o3") ||
       options.config.model.startsWith("o4-mini");
-    if (isDalle3) {
+    if (isImageRequest) {
       const prompt = getMessageTextContent(
         options.messages.slice(-1)?.pop() as any,
       );
-      requestPayload = {
-        model: options.config.model,
-        prompt,
-        // URLs are only valid for 60 minutes after the image has been generated.
-        response_format: "b64_json", // using b64_json, and save image in CacheStorage
-        n: 1,
-        size: options.config?.size ?? "1024x1024",
-        quality: options.config?.quality ?? "standard",
-        style: options.config?.style ?? "vivid",
-      };
+      if (isImageEdit) {
+        if (!sourceImageUrl) {
+          options.onError?.(
+            new Error("No image is available in this conversation to edit."),
+          );
+          return;
+        }
+        const imageResponse = await fetch(sourceImageUrl, {
+          credentials: "include",
+        });
+        if (!imageResponse.ok) {
+          options.onError?.(
+            new Error("The source image is no longer available for editing."),
+          );
+          return;
+        }
+        const image = await imageResponse.blob();
+        imageEditBody = new FormData();
+        imageEditBody.append("image", image, "source-image.png");
+        imageEditBody.append("model", imageModel);
+        imageEditBody.append("prompt", prompt);
+        imageEditBody.append("response_format", "b64_json");
+        requestPayload = {} as DalleRequestPayload;
+      } else {
+        requestPayload = {
+          model: imageModel,
+          prompt,
+          // URLs are only valid for 60 minutes after the image has been generated.
+          response_format: "b64_json", // using b64_json, and save image in CacheStorage
+          n: 1,
+          size: options.config?.size ?? "1024x1024",
+          // gpt-image-2 rejects the DALL·E-only `style` parameter.
+          // Keep these controls for explicit DALL·E 3 requests only.
+          ...(isDalle3
+            ? {
+                quality: options.config?.quality ?? "standard",
+                style: options.config?.style ?? "vivid",
+              }
+            : {}),
+        } as DalleRequestPayload;
+      }
     } else {
       const visionModel = isVisionModel(options.config.model);
       const messages: ChatOptions["messages"] = [];
@@ -251,6 +367,10 @@ export class ChatGPTApi implements LLMApi {
         requestPayload["max_completion_tokens"] = modelConfig.max_tokens;
       }
 
+      if (supportsReasoningEffort(modelConfig.model)) {
+        requestPayload["reasoning_effort"] = modelConfig.reasoning_effort;
+      }
+
       // add max_tokens to vision model
       if (visionModel && !isO1OrO3) {
         requestPayload["max_tokens"] = Math.max(modelConfig.max_tokens, 4000);
@@ -259,7 +379,7 @@ export class ChatGPTApi implements LLMApi {
 
     console.log("[Request] openai payload: ", requestPayload);
 
-    const shouldStream = !isDalle3 && !!options.config.stream;
+    const shouldStream = !isImageRequest && !!options.config.stream;
     const controller = new AbortController();
     options.onController?.(controller);
 
@@ -285,17 +405,32 @@ export class ChatGPTApi implements LLMApi {
             model?.provider?.providerName === ServiceProvider.Azure,
         );
         chatPath = this.path(
-          (isDalle3 ? Azure.ImagePath : Azure.ChatPath)(
+          (isImageRequest ? Azure.ImagePath : Azure.ChatPath)(
             (model?.displayName ?? model?.name) as string,
             useCustomConfig ? useAccessStore.getState().azureApiVersion : "",
           ),
         );
       } else {
         chatPath = this.path(
-          isDalle3 ? OpenaiPath.ImagePath : OpenaiPath.ChatPath,
+          isImageEdit
+            ? OpenaiPath.ImageEditPath
+            : isImageRequest
+            ? OpenaiPath.ImagePath
+            : OpenaiPath.ChatPath,
         );
       }
-      if (shouldStream) {
+      if (imageEditBody) {
+        const imageHeaders = getHeaders(true);
+        imageHeaders.Accept = "application/json";
+        const res = await fetch(chatPath, {
+          method: "POST",
+          body: imageEditBody,
+          signal: controller.signal,
+          headers: imageHeaders,
+        });
+        const message = await this.extractMessage(await res.json());
+        options.onFinish(message, res);
+      } else if (shouldStream) {
         let index = -1;
         const [tools, funcs] = usePluginStore
           .getState()

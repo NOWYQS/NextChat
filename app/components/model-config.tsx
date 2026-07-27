@@ -8,6 +8,7 @@ import { useAllModels } from "../utils/hooks";
 import { groupBy } from "lodash-es";
 import styles from "./model-config.module.scss";
 import { getModelProvider } from "../utils/model";
+import { supportsReasoningEffort } from "../utils";
 
 export function ModelConfigList(props: {
   modelConfig: ModelConfig;
@@ -89,6 +90,38 @@ export function ModelConfigList(props: {
           }}
         ></InputRange>
       </ListItem>
+      {supportsReasoningEffort(props.modelConfig.model) && (
+        <ListItem
+          title={Locale.Settings.ReasoningEffort.Title}
+          subTitle={Locale.Settings.ReasoningEffort.SubTitle}
+        >
+          <Select
+            aria-label={Locale.Settings.ReasoningEffort.Title}
+            value={props.modelConfig.reasoning_effort ?? "medium"}
+            onChange={(e) =>
+              props.updateConfig(
+                (config) =>
+                  (config.reasoning_effort =
+                    ModalConfigValidator.reasoning_effort(
+                      e.currentTarget.value,
+                    )),
+              )
+            }
+          >
+            <option value="low">{Locale.Settings.ReasoningEffort.Low}</option>
+            <option value="medium">
+              {Locale.Settings.ReasoningEffort.Medium}
+            </option>
+            <option value="high">{Locale.Settings.ReasoningEffort.High}</option>
+            <option value="xhigh">
+              {Locale.Settings.ReasoningEffort.ExtraHigh}
+            </option>
+            <option value="max">
+              {Locale.Settings.ReasoningEffort.Maximum}
+            </option>
+          </Select>
+        </ListItem>
+      )}
       <ListItem
         title={Locale.Settings.MaxTokens.Title}
         subTitle={Locale.Settings.MaxTokens.SubTitle}
