@@ -54,6 +54,7 @@ import {
   ChatMessage,
   createMessage,
   DEFAULT_TOPIC,
+  ModelConfig,
   ModelType,
   SubmitKey,
   Theme,
@@ -704,6 +705,7 @@ export function ChatActions(props: {
   const [showUploadImage, setShowUploadImage] = useState(false);
 
   const [showSizeSelector, setShowSizeSelector] = useState(false);
+  const [showImageSettings, setShowImageSettings] = useState(false);
   const [showQualitySelector, setShowQualitySelector] = useState(false);
   const [showStyleSelector, setShowStyleSelector] = useState(false);
   const modelSizes = getModelSizes(currentModel);
@@ -713,6 +715,15 @@ export function ChatActions(props: {
     session.mask.modelConfig?.size ?? ("1024x1024" as ModelSize);
   const currentQuality = session.mask.modelConfig?.quality ?? "standard";
   const currentStyle = session.mask.modelConfig?.style ?? "vivid";
+  const imageSizeMode = session.mask.modelConfig.imageSizeMode ?? "preset";
+  const imageResolution = session.mask.modelConfig.imageResolution ?? "2k";
+  const imageAspectRatio = session.mask.modelConfig.imageAspectRatio ?? "16:9";
+  const updateImageConfig = (updater: (config: ModelConfig) => void) => {
+    chatStore.updateTargetSession(session, (session) => {
+      session.mask.syncGlobalConfig = false;
+      updater(session.mask.modelConfig);
+    });
+  };
 
   const isMobileScreen = useMobileScreen();
 
@@ -767,6 +778,198 @@ export function ChatActions(props: {
             icon={<SettingsIcon />}
           />
         )}
+
+        <div className={styles["chat-image-settings"]}>
+          <ChatAction
+            onClick={() => {
+              setShowImageSettings((value) => !value);
+              setShowModelControl(false);
+              setShowReasoningControl(false);
+            }}
+            text={Locale.Chat.InputActions.ImageSettings}
+            icon={<SizeIcon />}
+          />
+          {showImageSettings && (
+            <div
+              className={styles["chat-image-settings-panel"]}
+              role="dialog"
+              aria-label={Locale.Chat.InputActions.ImageSettings}
+            >
+              <div className={styles["chat-image-settings-header"]}>
+                <strong>{Locale.Chat.InputActions.ImageSettings}</strong>
+                <button
+                  type="button"
+                  aria-label={Locale.UI.Close}
+                  onClick={() => setShowImageSettings(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <label className={styles["chat-image-settings-field"]}>
+                <span>模式</span>
+                <select
+                  value={imageSizeMode}
+                  onChange={(event) => {
+                    const mode = event.currentTarget.value as
+                      | "auto"
+                      | "preset"
+                      | "custom";
+                    updateImageConfig((config) => {
+                      config.imageSizeMode = mode;
+                    });
+                  }}
+                >
+                  <option value="auto">
+                    {Locale.Chat.InputActions.ImageSizeAuto}
+                  </option>
+                  <option value="preset">
+                    {Locale.Chat.InputActions.ImageSizePreset}
+                  </option>
+                  <option value="custom">
+                    {Locale.Chat.InputActions.ImageSizeCustom}
+                  </option>
+                </select>
+              </label>
+
+              {imageSizeMode === "auto" && (
+                <p className={styles["chat-image-settings-hint"]}>
+                  不传尺寸参数；提示词中的“4K”“横图”“竖图”等由图片模型自行理解。
+                </p>
+              )}
+
+              {imageSizeMode === "preset" && (
+                <>
+                  <div className={styles["chat-image-settings-grid"]}>
+                    <label className={styles["chat-image-settings-field"]}>
+                      <span>{Locale.Chat.InputActions.ImageResolution}</span>
+                      <select
+                        value={imageResolution}
+                        onChange={(event) => {
+                          const resolution = event.currentTarget.value as
+                            | "1k"
+                            | "2k"
+                            | "4k";
+                          updateImageConfig((config) => {
+                            config.imageResolution = resolution;
+                          });
+                        }}
+                      >
+                        <option value="1k">1K · 1024 长边</option>
+                        <option value="2k">2K · 2048 长边</option>
+                        <option value="4k">4K · 4096 长边</option>
+                      </select>
+                    </label>
+                    <label className={styles["chat-image-settings-field"]}>
+                      <span>{Locale.Chat.InputActions.ImageAspectRatio}</span>
+                      <select
+                        value={imageAspectRatio}
+                        onChange={(event) => {
+                          const aspectRatio = event.currentTarget.value as
+                            | "1:1"
+                            | "16:9"
+                            | "9:16"
+                            | "3:2"
+                            | "2:3"
+                            | "custom";
+                          updateImageConfig((config) => {
+                            config.imageAspectRatio = aspectRatio;
+                          });
+                        }}
+                      >
+                        <option value="1:1">1:1 · 方图</option>
+                        <option value="16:9">16:9 · 横图</option>
+                        <option value="9:16">9:16 · 竖图</option>
+                        <option value="3:2">3:2 · 横图</option>
+                        <option value="2:3">2:3 · 竖图</option>
+                        <option value="custom">
+                          {Locale.Chat.InputActions.ImageCustomRatio}
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+                  {imageAspectRatio === "custom" && (
+                    <div className={styles["chat-image-settings-grid"]}>
+                      <label className={styles["chat-image-settings-field"]}>
+                        <span>{Locale.Chat.InputActions.ImageCustomRatio} 宽</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={session.mask.modelConfig.imageCustomAspectWidth ?? 1}
+                          onChange={(event) => {
+                            const value = Number(event.currentTarget.value);
+                            if (!Number.isInteger(value) || value <= 0) return;
+                            updateImageConfig((config) => {
+                              config.imageCustomAspectWidth = value;
+                            });
+                          }}
+                        />
+                      </label>
+                      <label className={styles["chat-image-settings-field"]}>
+                        <span>{Locale.Chat.InputActions.ImageCustomRatio} 高</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={session.mask.modelConfig.imageCustomAspectHeight ?? 1}
+                          onChange={(event) => {
+                            const value = Number(event.currentTarget.value);
+                            if (!Number.isInteger(value) || value <= 0) return;
+                            updateImageConfig((config) => {
+                              config.imageCustomAspectHeight = value;
+                            });
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {imageSizeMode === "custom" && (
+                <>
+                  <div className={styles["chat-image-settings-grid"]}>
+                    <label className={styles["chat-image-settings-field"]}>
+                      <span>{Locale.Chat.InputActions.ImageCustomPixels} 宽</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={session.mask.modelConfig.imageCustomWidth ?? 2048}
+                        onChange={(event) => {
+                          const value = Number(event.currentTarget.value);
+                          if (!Number.isInteger(value) || value <= 0) return;
+                          updateImageConfig((config) => {
+                            config.imageCustomWidth = value;
+                          });
+                        }}
+                      />
+                    </label>
+                    <label className={styles["chat-image-settings-field"]}>
+                      <span>{Locale.Chat.InputActions.ImageCustomPixels} 高</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={session.mask.modelConfig.imageCustomHeight ?? 1152}
+                        onChange={(event) => {
+                          const value = Number(event.currentTarget.value);
+                          if (!Number.isInteger(value) || value <= 0) return;
+                          updateImageConfig((config) => {
+                            config.imageCustomHeight = value;
+                          });
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <p className={styles["chat-image-settings-hint"]}>
+                    直接传入宽 × 高。上游不接受的尺寸会显示接口错误，不会自动降级。
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {showUploadImage && (
           <ChatAction

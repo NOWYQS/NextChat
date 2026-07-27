@@ -1,21 +1,95 @@
 export const AUTO_IMAGE_MODEL = "gpt-image-2";
+
 export type AutoImageResolution = "1k" | "2k" | "4k";
+export type AutoImageSizeMode = "auto" | "preset" | "custom";
+export type AutoImageAspectRatio =
+  | "1:1"
+  | "16:9"
+  | "9:16"
+  | "3:2"
+  | "2:3"
+  | "custom";
 
 export const DEFAULT_AUTO_IMAGE_RESOLUTION: AutoImageResolution = "2k";
+export const DEFAULT_AUTO_IMAGE_SIZE_MODE: AutoImageSizeMode = "preset";
+export const DEFAULT_AUTO_IMAGE_ASPECT_RATIO: AutoImageAspectRatio = "16:9";
 
-// gpt-image-2 accepts explicit pixel dimensions. Keep the UI compact while
-// preserving a single, predictable 16:9 landscape output for each tier.
-const AUTO_IMAGE_RESOLUTION_SIZES: Record<AutoImageResolution, string> = {
-  "1k": "1024x576",
-  "2k": "2048x1152",
-  "4k": "4096x2304",
+const AUTO_IMAGE_RESOLUTION_LONG_EDGE: Record<AutoImageResolution, number> = {
+  "1k": 1024,
+  "2k": 2048,
+  "4k": 4096,
 };
 
-export function getAutoImageSize(resolution?: string): string {
-  return (
-    AUTO_IMAGE_RESOLUTION_SIZES[resolution as AutoImageResolution] ??
-    AUTO_IMAGE_RESOLUTION_SIZES[DEFAULT_AUTO_IMAGE_RESOLUTION]
-  );
+const AUTO_IMAGE_ASPECT_RATIOS: Record<
+  Exclude<AutoImageAspectRatio, "custom">,
+  readonly [number, number]
+> = {
+  "1:1": [1, 1],
+  "16:9": [16, 9],
+  "9:16": [9, 16],
+  "3:2": [3, 2],
+  "2:3": [2, 3],
+};
+
+export interface AutoImageSizeConfig {
+  imageSizeMode?: string;
+  imageResolution?: string;
+  imageAspectRatio?: string;
+  imageCustomAspectWidth?: number;
+  imageCustomAspectHeight?: number;
+  imageCustomWidth?: number;
+  imageCustomHeight?: number;
+}
+
+function positiveInteger(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  return Math.round(numeric);
+}
+
+function toSize(width: number, height: number): string {
+  return `${width}x${height}`;
+}
+
+/**
+ * Returns undefined for automatic mode so the API receives no `size` parameter.
+ * Manual tiers retain a stable long edge while applying the chosen aspect ratio.
+ */
+export function getAutoImageSize(config?: AutoImageSizeConfig): string | undefined {
+  const mode = config?.imageSizeMode ?? DEFAULT_AUTO_IMAGE_SIZE_MODE;
+  if (mode === "auto") return undefined;
+
+  if (mode === "custom") {
+    const width = positiveInteger(config?.imageCustomWidth);
+    const height = positiveInteger(config?.imageCustomHeight);
+    return width && height ? toSize(width, height) : undefined;
+  }
+
+  const resolution =
+    (config?.imageResolution as AutoImageResolution) ??
+    DEFAULT_AUTO_IMAGE_RESOLUTION;
+  const longEdge =
+    AUTO_IMAGE_RESOLUTION_LONG_EDGE[resolution] ??
+    AUTO_IMAGE_RESOLUTION_LONG_EDGE[DEFAULT_AUTO_IMAGE_RESOLUTION];
+  const aspectRatio =
+    (config?.imageAspectRatio as AutoImageAspectRatio) ??
+    DEFAULT_AUTO_IMAGE_ASPECT_RATIO;
+  const presetAspectRatio =
+    (aspectRatio === "custom"
+      ? DEFAULT_AUTO_IMAGE_ASPECT_RATIO
+      : aspectRatio) as Exclude<AutoImageAspectRatio, "custom">;
+  const [ratioWidth, ratioHeight] =
+    aspectRatio === "custom"
+      ? [
+          positiveInteger(config?.imageCustomAspectWidth) ?? 1,
+          positiveInteger(config?.imageCustomAspectHeight) ?? 1,
+        ]
+      : AUTO_IMAGE_ASPECT_RATIOS[presetAspectRatio];
+
+  if (ratioWidth >= ratioHeight) {
+    return toSize(longEdge, Math.round((longEdge * ratioHeight) / ratioWidth));
+  }
+  return toSize(Math.round((longEdge * ratioWidth) / ratioHeight), longEdge);
 }
 
 /**

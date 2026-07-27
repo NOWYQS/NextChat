@@ -51,25 +51,6 @@ export function ModelConfigList(props: {
         </Select>
       </ListItem>
       <ListItem
-        title={Locale.Chat.InputActions.ImageResolution}
-        subTitle="图片生成和连续编辑使用 16:9 横向输出"
-      >
-        <Select
-          aria-label={Locale.Chat.InputActions.ImageResolution}
-          value={props.modelConfig.imageResolution ?? "2k"}
-          onChange={(e) => {
-            const resolution = e.currentTarget.value as "1k" | "2k" | "4k";
-            props.updateConfig((config) => {
-              config.imageResolution = resolution;
-            });
-          }}
-        >
-          <option value="1k">1K · 1024 × 576</option>
-          <option value="2k">2K · 2048 × 1152</option>
-          <option value="4k">4K · 4096 × 2304</option>
-        </Select>
-      </ListItem>
-      <ListItem
         title={Locale.Settings.Temperature.Title}
         subTitle={Locale.Settings.Temperature.SubTitle}
       >
