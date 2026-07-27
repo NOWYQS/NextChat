@@ -1,5 +1,7 @@
 import {
   AUTO_IMAGE_MODEL,
+  DEFAULT_AUTO_IMAGE_RESOLUTION,
+  getAutoImageSize,
   isAutoImageEndpointRequest,
   isImageIntentCandidate,
   parseImageIntent,
@@ -36,6 +38,14 @@ describe("auto image generation intent gate", () => {
     expect(
       isAutoImageEndpointRequest("v1/images/generations", "gpt-5.6-terra"),
     ).toBe(false);
+  });
+
+  test("maps image-resolution tiers to explicit 16:9 API sizes", () => {
+    expect(DEFAULT_AUTO_IMAGE_RESOLUTION).toBe("2k");
+    expect(getAutoImageSize("1k")).toBe("1024x576");
+    expect(getAutoImageSize("2k")).toBe("2048x1152");
+    expect(getAutoImageSize("4k")).toBe("4096x2304");
+    expect(getAutoImageSize("unexpected")).toBe("2048x1152");
   });
 
   test.each([

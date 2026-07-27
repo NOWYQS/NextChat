@@ -26,6 +26,7 @@ import {
 } from "@/app/utils/chat";
 import {
   AUTO_IMAGE_MODEL,
+  getAutoImageSize,
   isImageIntentCandidate,
   parseImageIntent,
   type ImageIntent,
@@ -312,6 +313,10 @@ export class ChatGPTApi implements LLMApi {
         imageEditBody.append("model", imageModel);
         imageEditBody.append("prompt", prompt);
         imageEditBody.append("response_format", "b64_json");
+        imageEditBody.append(
+          "size",
+          getAutoImageSize(modelConfig.imageResolution),
+        );
         requestPayload = {} as DalleRequestPayload;
       } else {
         requestPayload = {
@@ -320,7 +325,9 @@ export class ChatGPTApi implements LLMApi {
           // URLs are only valid for 60 minutes after the image has been generated.
           response_format: "b64_json", // using b64_json, and save image in CacheStorage
           n: 1,
-          size: options.config?.size ?? "1024x1024",
+          size: isAutoImageRequest
+            ? getAutoImageSize(modelConfig.imageResolution)
+            : options.config?.size ?? "1024x1024",
           // gpt-image-2 rejects the DALL·E-only `style` parameter.
           // Keep these controls for explicit DALL·E 3 requests only.
           ...(isDalle3

@@ -17,6 +17,7 @@ import {
 import { createPersistStore } from "../utils/store";
 import type { Voice } from "rt-client";
 import { normalizeReasoningEffort, ReasoningEffort } from "../utils/reasoning";
+import { type AutoImageResolution } from "../utils/image-generation";
 
 export type ModelType = (typeof DEFAULT_MODELS)[number]["name"];
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
@@ -71,6 +72,7 @@ export const DEFAULT_CONFIG = {
     top_p: 1,
     reasoning_effort: "medium" as ReasoningEffort,
     enableImageGeneration: true,
+    imageResolution: "2k" as AutoImageResolution,
     max_tokens: 4000,
     presence_penalty: 0,
     frequency_penalty: 0,
@@ -201,7 +203,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.3,
+    version: 4.4,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -269,6 +271,11 @@ export const useAppConfig = createPersistStore(
       if (version < 4.3) {
         state.modelConfig.enableImageGeneration =
           DEFAULT_CONFIG.modelConfig.enableImageGeneration;
+      }
+
+      if (version < 4.4) {
+        state.modelConfig.imageResolution =
+          DEFAULT_CONFIG.modelConfig.imageResolution;
       }
 
       return state as any;

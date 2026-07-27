@@ -85,6 +85,7 @@ const en: LocaleType = {
       Model: "Model",
       ReasoningEffort: "Thinking",
       EnableImageGeneration: "Enable image generation",
+      ImageResolution: "Image resolution",
       NotApplicable: "N/A",
     },
     Rename: "Rename Chat",

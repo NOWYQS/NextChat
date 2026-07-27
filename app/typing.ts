@@ -14,7 +14,10 @@ export type DalleStyle = "vivid" | "natural";
 
 export type ModelSize =
   | "1024x1024"
+  | "1024x576"
   | "1792x1024"
+  | "2048x1152"
+  | "4096x2304"
   | "1024x1792"
   | "768x1344"
   | "864x1152"

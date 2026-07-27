@@ -84,6 +84,7 @@ const cn = {
       Model: "模型",
       ReasoningEffort: "思考",
       EnableImageGeneration: "启用图片生成",
+      ImageResolution: "图片分辨率",
       NotApplicable: "不适用",
     },
     Rename: "重命名对话",

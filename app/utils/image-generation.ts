@@ -1,4 +1,22 @@
 export const AUTO_IMAGE_MODEL = "gpt-image-2";
+export type AutoImageResolution = "1k" | "2k" | "4k";
+
+export const DEFAULT_AUTO_IMAGE_RESOLUTION: AutoImageResolution = "2k";
+
+// gpt-image-2 accepts explicit pixel dimensions. Keep the UI compact while
+// preserving a single, predictable 16:9 landscape output for each tier.
+const AUTO_IMAGE_RESOLUTION_SIZES: Record<AutoImageResolution, string> = {
+  "1k": "1024x576",
+  "2k": "2048x1152",
+  "4k": "4096x2304",
+};
+
+export function getAutoImageSize(resolution?: string): string {
+  return (
+    AUTO_IMAGE_RESOLUTION_SIZES[resolution as AutoImageResolution] ??
+    AUTO_IMAGE_RESOLUTION_SIZES[DEFAULT_AUTO_IMAGE_RESOLUTION]
+  );
+}
 
 /**
  * gpt-image-2 is deliberately omitted from the visible model allowlist.

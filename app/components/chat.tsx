@@ -2224,7 +2224,7 @@ function _Chat() {
                                   }
                                 >
                                   <DownloadIcon />
-                                  <span>下载原图</span>
+                                  <span>下载</span>
                                 </button>
                               </div>
                             )}
@@ -2266,7 +2266,7 @@ function _Chat() {
                                           }
                                         >
                                           <DownloadIcon />
-                                          <span>下载原图</span>
+                                          <span>下载</span>
                                         </button>
                                       </div>
                                     );
