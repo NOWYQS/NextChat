@@ -34,6 +34,7 @@ import ConfirmIcon from "../icons/confirm.svg";
 import CloseIcon from "../icons/close.svg";
 import CancelIcon from "../icons/cancel.svg";
 import ImageIcon from "../icons/image.svg";
+import DownloadIcon from "../icons/download.svg";
 
 import LightIcon from "../icons/light.svg";
 import DarkIcon from "../icons/dark.svg";
@@ -127,6 +128,32 @@ import { RealtimeChat } from "@/app/components/realtime-chat";
 import clsx from "clsx";
 import { getAvailableClientsCount, isMcpEnabled } from "../mcp/actions";
 import { splitReasoningContent } from "../utils/reasoning";
+
+async function downloadMessageImage(imageUrl: string, index: number) {
+  const fallback = () => {
+    const link = document.createElement("a");
+    link.href = imageUrl;
+    link.download = `nextchat-image-${index + 1}`;
+    link.click();
+  };
+
+  try {
+    const response = await fetch(imageUrl, { credentials: "include" });
+    if (!response.ok) throw new Error("Image download failed");
+
+    const blob = await response.blob();
+    const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `nextchat-image-${index + 1}.${extension}`;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    console.warn("[Image] falling back to direct image download", error);
+    fallback();
+  }
+}
 
 const localStorage = safeLocalStorage();
 
@@ -2180,11 +2207,26 @@ function _Chat() {
                               defaultShow={i >= messages.length - 6}
                             />
                             {getMessageImages(message).length == 1 && (
-                              <img
-                                className={styles["chat-message-item-image"]}
-                                src={getMessageImages(message)[0]}
-                                alt=""
-                              />
+                              <div className={styles["chat-message-image-wrapper"]}>
+                                <img
+                                  className={styles["chat-message-item-image"]}
+                                  src={getMessageImages(message)[0]}
+                                  alt=""
+                                />
+                                <button
+                                  type="button"
+                                  className={styles["chat-message-image-download"]}
+                                  onClick={() =>
+                                    downloadMessageImage(
+                                      getMessageImages(message)[0],
+                                      0,
+                                    )
+                                  }
+                                >
+                                  <DownloadIcon />
+                                  <span>下载原图</span>
+                                </button>
+                              </div>
                             )}
                             {getMessageImages(message).length > 1 && (
                               <div
@@ -2199,16 +2241,34 @@ function _Chat() {
                                 {getMessageImages(message).map(
                                   (image, index) => {
                                     return (
-                                      <img
+                                      <div
                                         className={
-                                          styles[
-                                            "chat-message-item-image-multi"
-                                          ]
+                                          styles["chat-message-image-wrapper"]
                                         }
                                         key={index}
-                                        src={image}
-                                        alt=""
-                                      />
+                                      >
+                                        <img
+                                          className={
+                                            styles[
+                                              "chat-message-item-image-multi"
+                                            ]
+                                          }
+                                          src={image}
+                                          alt=""
+                                        />
+                                        <button
+                                          type="button"
+                                          className={
+                                            styles["chat-message-image-download"]
+                                          }
+                                          onClick={() =>
+                                            downloadMessageImage(image, index)
+                                          }
+                                        >
+                                          <DownloadIcon />
+                                          <span>下载原图</span>
+                                        </button>
+                                      </div>
                                     );
                                   },
                                 )}
