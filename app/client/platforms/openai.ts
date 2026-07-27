@@ -423,14 +423,22 @@ export class ChatGPTApi implements LLMApi {
       if (imageEditBody) {
         const imageHeaders = getHeaders(true);
         imageHeaders.Accept = "application/json";
-        const res = await fetch(chatPath, {
-          method: "POST",
-          body: imageEditBody,
-          signal: controller.signal,
-          headers: imageHeaders,
-        });
-        const message = await this.extractMessage(await res.json());
-        options.onFinish(message, res);
+        const requestTimeoutId = setTimeout(
+          () => controller.abort(),
+          REQUEST_TIMEOUT_MS_FOR_THINKING,
+        );
+        try {
+          const res = await fetch(chatPath, {
+            method: "POST",
+            body: imageEditBody,
+            signal: controller.signal,
+            headers: imageHeaders,
+          });
+          const message = await this.extractMessage(await res.json());
+          options.onFinish(message, res);
+        } finally {
+          clearTimeout(requestTimeoutId);
+        }
       } else if (shouldStream) {
         let index = -1;
         const [tools, funcs] = usePluginStore
