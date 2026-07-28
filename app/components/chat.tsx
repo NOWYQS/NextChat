@@ -68,6 +68,7 @@ import {
   copyToClipboard,
   getMessageImages,
   getMessageTextContent,
+  isMessageContentEmpty,
   isDalle3,
   isVisionModel,
   safeLocalStorage,
@@ -2009,7 +2010,7 @@ function _Chat() {
                   const isContext = i < context.length;
                   const showActions =
                     i > 0 &&
-                    !(message.preview || message.content.length === 0) &&
+                    !(message.preview || isMessageContentEmpty(message)) &&
                     !isContext;
                   const showTyping = message.preview || message.streaming;
 
@@ -2193,7 +2194,7 @@ function _Chat() {
                               streaming={Boolean(message.streaming)}
                               loading={Boolean(
                                 (message.preview || message.streaming) &&
-                                  message.content.length === 0 &&
+                                  isMessageContentEmpty(message) &&
                                   !isUser,
                               )}
                               //   onContextMenu={(e) => onRightClick(e, message)} // hard to use

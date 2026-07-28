@@ -248,6 +248,22 @@ export function getMessageTextContent(message: RequestMessage) {
   return "";
 }
 
+/**
+ * Persisted conversations can contain legacy null or malformed content even
+ * though the current RequestMessage type only models valid values. Keep render
+ * decisions behind the same runtime boundary as the text/image helpers.
+ */
+export function isMessageContentEmpty(message: RequestMessage): boolean {
+  const content: unknown = message.content;
+  if (typeof content === "string") {
+    return content.length === 0;
+  }
+  if (Array.isArray(content)) {
+    return content.length === 0;
+  }
+  return true;
+}
+
 export function getMessageTextContentWithoutThinking(message: RequestMessage) {
   let content = "";
 

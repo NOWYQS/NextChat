@@ -1,5 +1,8 @@
+import { jest } from "@jest/globals";
 import {
   AUTO_IMAGE_MODEL,
+  createImageIntentAbortController,
+  isAutoImageEditEndpointRequest,
   isAutoImageEndpointRequest,
   isImageIntentCandidate,
   parseImageIntent,
@@ -38,6 +41,19 @@ describe("auto image generation intent gate", () => {
     ).toBe(false);
   });
 
+  test("allows multipart edits only for the exact hidden image model", () => {
+    expect(
+      isAutoImageEditEndpointRequest("v1/images/edits", AUTO_IMAGE_MODEL),
+    ).toBe(true);
+    expect(
+      isAutoImageEditEndpointRequest("v1/images/generations", AUTO_IMAGE_MODEL),
+    ).toBe(false);
+    expect(isAutoImageEditEndpointRequest("v1/images/edits", "other-model")).toBe(
+      false,
+    );
+    expect(isAutoImageEditEndpointRequest("v1/images/edits", null)).toBe(false);
+  });
+
   test.each([
     ["generate", "generate"],
     ["EDIT", "edit"],
@@ -45,5 +61,33 @@ describe("auto image generation intent gate", () => {
     ["unexpected", "chat"],
   ] as const)("parses classifier result %s", (value, expected) => {
     expect(parseImageIntent(value)).toBe(expected);
+  });
+
+  test("cancels intent classification with the parent request", () => {
+    jest.useFakeTimers();
+    const parent = new AbortController();
+    const request = createImageIntentAbortController(parent.signal, 15_000);
+
+    parent.abort();
+    expect(request.signal.aborted).toBe(true);
+
+    request.cleanup();
+    jest.useRealTimers();
+  });
+
+  test("times out intent classification and clears unused timers", () => {
+    jest.useFakeTimers();
+    const timedOut = createImageIntentAbortController(undefined, 15_000);
+    jest.advanceTimersByTime(14_999);
+    expect(timedOut.signal.aborted).toBe(false);
+    jest.advanceTimersByTime(1);
+    expect(timedOut.signal.aborted).toBe(true);
+    timedOut.cleanup();
+
+    const cleaned = createImageIntentAbortController(undefined, 15_000);
+    cleaned.cleanup();
+    jest.advanceTimersByTime(15_000);
+    expect(cleaned.signal.aborted).toBe(false);
+    jest.useRealTimers();
   });
 });

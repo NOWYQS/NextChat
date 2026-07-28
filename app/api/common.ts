@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSideConfig } from "../config/server";
-import { OPENAI_BASE_URL, ServiceProvider } from "../constant";
+import { OPENAI_BASE_URL, OpenaiPath, ServiceProvider } from "../constant";
 import { cloudflareAIGatewayUrl } from "../utils/cloudflare";
-import { isAutoImageEndpointRequest } from "../utils/image-generation";
+import {
+  isAutoImageEditEndpointRequest,
+  isAutoImageEndpointRequest,
+} from "../utils/image-generation";
 import { getModelProvider, isModelNotavailableInServer } from "../utils/model";
 
 const serverConfig = getServerSideConfig();
@@ -43,13 +46,6 @@ export async function requestOpenai(req: NextRequest) {
 
   console.log("[Proxy] ", path);
   console.log("[Base Url]", baseUrl);
-
-  const timeoutId = setTimeout(
-    () => {
-      controller.abort();
-    },
-    10 * 60 * 1000,
-  );
 
   if (isAzure) {
     const azureApiVersion =
@@ -149,6 +145,49 @@ export async function requestOpenai(req: NextRequest) {
       console.error("[OpenAI] gpt4 filter", e);
     }
   }
+
+  if (
+    serverConfig.customModels &&
+    req.body &&
+    contentType.toLowerCase().startsWith("multipart/form-data")
+  ) {
+    try {
+      const formData = await req.clone().formData();
+      const model = formData.get("model");
+      if (
+        path !== OpenaiPath.ImageEditPath ||
+        !isAutoImageEditEndpointRequest(path, model)
+      ) {
+        return NextResponse.json(
+          {
+            error: true,
+            message: "you are not allowed to use this image edit model",
+          },
+          {
+            status: 403,
+          },
+        );
+      }
+    } catch (e) {
+      console.error("[OpenAI] invalid multipart image request");
+      return NextResponse.json(
+        {
+          error: true,
+          message: "invalid multipart image edit request",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+  }
+
+  const timeoutId = setTimeout(
+    () => {
+      controller.abort();
+    },
+    10 * 60 * 1000,
+  );
 
   try {
     const res = await fetch(fetchUrl, fetchOptions);

@@ -1,4 +1,5 @@
 export const AUTO_IMAGE_MODEL = "gpt-image-2";
+export const IMAGE_INTENT_TIMEOUT_MS = 15_000;
 
 /**
  * gpt-image-2 is deliberately omitted from the visible model allowlist.
@@ -9,6 +10,42 @@ export function isAutoImageEndpointRequest(path: string, model?: string) {
     model === AUTO_IMAGE_MODEL &&
     (path === "v1/images/generations" || path === "v1/images/edits")
   );
+}
+
+/** Multipart image edits are the only non-JSON hidden-model request. */
+export function isAutoImageEditEndpointRequest(
+  path: string,
+  model: unknown,
+): boolean {
+  return (
+    path === "v1/images/edits" &&
+    typeof model === "string" &&
+    model === AUTO_IMAGE_MODEL
+  );
+}
+
+export function createImageIntentAbortController(
+  parentSignal?: AbortSignal,
+  timeoutMs = IMAGE_INTENT_TIMEOUT_MS,
+) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+
+  if (parentSignal?.aborted) {
+    abort();
+  } else {
+    parentSignal?.addEventListener("abort", abort, { once: true });
+  }
+
+  const timeoutId = setTimeout(abort, timeoutMs);
+
+  return {
+    signal: controller.signal,
+    cleanup() {
+      clearTimeout(timeoutId);
+      parentSignal?.removeEventListener("abort", abort);
+    },
+  };
 }
 
 export type ImageIntent = "generate" | "edit" | "chat";

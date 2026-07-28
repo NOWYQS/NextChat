@@ -26,6 +26,7 @@ import {
 } from "@/app/utils/chat";
 import {
   AUTO_IMAGE_MODEL,
+  createImageIntentAbortController,
   isImageIntentCandidate,
   parseImageIntent,
   type ImageIntent,
@@ -168,6 +169,7 @@ export class ChatGPTApi implements LLMApi {
     options: ChatOptions,
     modelConfig: any,
     sourceImageUrl: string,
+    signal?: AbortSignal,
   ): Promise<ImageIntent> {
     if (modelConfig.enableImageGeneration === false) return "chat";
 
@@ -190,9 +192,11 @@ export class ChatGPTApi implements LLMApi {
         ? "gpt-5.6-terra"
         : modelConfig.model;
 
+    const classifierRequest = createImageIntentAbortController(signal);
     try {
       const response = await fetch(this.path(OpenaiPath.ChatPath), {
         method: "POST",
+        signal: classifierRequest.signal,
         headers: getHeaders(),
         body: JSON.stringify({
           model: classifierModel,
@@ -213,8 +217,12 @@ export class ChatGPTApi implements LLMApi {
       const payload = await response.json();
       return parseImageIntent(payload?.choices?.[0]?.message?.content);
     } catch (error) {
-      console.warn("[Image Generation] intent classifier unavailable", error);
+      if (!signal?.aborted) {
+        console.warn("[Image Generation] intent classifier unavailable", error);
+      }
       return "chat";
+    } finally {
+      classifierRequest.cleanup();
     }
   }
 
@@ -266,6 +274,9 @@ export class ChatGPTApi implements LLMApi {
       },
     };
 
+    const controller = new AbortController();
+    options.onController?.(controller);
+
     let requestPayload: RequestPayload | DalleRequestPayload;
 
     const sourceImageUrl = this.getLatestImageUrl(options.messages);
@@ -273,7 +284,9 @@ export class ChatGPTApi implements LLMApi {
       options,
       modelConfig,
       sourceImageUrl,
+      controller.signal,
     );
+    if (controller.signal.aborted) return;
     const isAutoImageRequest = imageIntent !== "chat";
     const isDalle3 = _isDalle3(options.config.model);
     const isImageRequest = isDalle3 || isAutoImageRequest;
@@ -381,8 +394,6 @@ export class ChatGPTApi implements LLMApi {
     console.log("[Request] openai payload: ", requestPayload);
 
     const shouldStream = !isImageRequest && !!options.config.stream;
-    const controller = new AbortController();
-    options.onController?.(controller);
 
     try {
       let chatPath = "";
