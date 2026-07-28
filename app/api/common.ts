@@ -153,6 +153,9 @@ export async function requestOpenai(req: NextRequest) {
   ) {
     try {
       const formData = await req.clone().formData();
+      // Request.clone() tees the body stream. Refresh the upstream body
+      // reference afterward so fetch does not receive the pre-clone branch.
+      fetchOptions.body = req.body;
       const model = formData.get("model");
       if (
         path !== OpenaiPath.ImageEditPath ||
