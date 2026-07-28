@@ -1621,6 +1621,22 @@ export function Settings() {
             </Select>
           </ListItem>
 
+          <ListItem
+            title={Locale.Settings.NewUI.Title}
+            subTitle={Locale.Settings.NewUI.SubTitle}
+          >
+            <input
+              aria-label={Locale.Settings.NewUI.Title}
+              type="checkbox"
+              checked={config.enableNewUi}
+              onChange={(e) =>
+                updateConfig(
+                  (config) => (config.enableNewUi = e.currentTarget.checked),
+                )
+              }
+            />
+          </ListItem>
+
           <ListItem title={Locale.Settings.Lang.Name}>
             <Select
               aria-label={Locale.Settings.Lang.Name}

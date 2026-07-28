@@ -76,6 +76,7 @@ import {
   supportsCustomSize,
   supportsReasoningEffort,
   useMobileScreen,
+  useWindowSize,
   selectOrCopy,
   showPlugins,
 } from "../utils";
@@ -129,6 +130,7 @@ import { RealtimeChat } from "@/app/components/realtime-chat";
 import clsx from "clsx";
 import { getAvailableClientsCount, isMcpEnabled } from "../mcp/actions";
 import { splitReasoningContent } from "../utils/reasoning";
+import { resolveNewUiMode } from "../utils/new-ui";
 
 async function downloadMessageImage(imageUrl: string, index: number) {
   const fallback = () => {
@@ -821,7 +823,6 @@ export function ChatActions(props: {
           }}
         />
 
-
         {supportsCustomSize(currentModel) && (
           <ChatAction
             onClick={() => setShowSizeSelector(true)}
@@ -991,7 +992,9 @@ export function ChatActions(props: {
               <label className={styles["chat-input-control-check"]}>
                 <input
                   type="checkbox"
-                  checked={session.mask.modelConfig.enableImageGeneration !== false}
+                  checked={
+                    session.mask.modelConfig.enableImageGeneration !== false
+                  }
                   onChange={(event) => {
                     chatStore.updateTargetSession(session, (session) => {
                       session.mask.modelConfig.enableImageGeneration =
@@ -1034,18 +1037,22 @@ export function ChatActions(props: {
                   value={session.mask.modelConfig.reasoning_effort ?? "medium"}
                   onChange={(event) => {
                     chatStore.updateTargetSession(session, (session) => {
-                      session.mask.modelConfig.reasoning_effort =
-                        event.currentTarget.value as any;
+                      session.mask.modelConfig.reasoning_effort = event
+                        .currentTarget.value as any;
                       session.mask.syncGlobalConfig = false;
                     });
                     setShowReasoningControl(false);
                   }}
                 >
-                  <option value="low">{Locale.Settings.ReasoningEffort.Low}</option>
+                  <option value="low">
+                    {Locale.Settings.ReasoningEffort.Low}
+                  </option>
                   <option value="medium">
                     {Locale.Settings.ReasoningEffort.Medium}
                   </option>
-                  <option value="high">{Locale.Settings.ReasoningEffort.High}</option>
+                  <option value="high">
+                    {Locale.Settings.ReasoningEffort.High}
+                  </option>
                   <option value="xhigh">
                     {Locale.Settings.ReasoningEffort.ExtraHigh}
                   </option>
@@ -1067,6 +1074,15 @@ export function ChatActions(props: {
       </div>
     </div>
   );
+}
+
+function ChatInputShell(props: {
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  if (!props.enabled) return <>{props.children}</>;
+
+  return <div className={styles["chat-input-shell"]}>{props.children}</div>;
 }
 
 export function EditMessageModal(props: { onClose: () => void }) {
@@ -1216,6 +1232,13 @@ function _Chat() {
   const config = useAppConfig();
   const fontSize = config.fontSize;
   const fontFamily = config.fontFamily;
+  const { width } = useWindowSize();
+  const newUi = resolveNewUiMode({
+    enabled: config.enableNewUi,
+    width,
+    isApp: !!getClientConfig()?.isApp,
+    routeEligible: true,
+  });
 
   const [showExport, setShowExport] = useState(false);
 
@@ -1903,7 +1926,12 @@ function _Chat() {
 
   return (
     <>
-      <div className={styles.chat} key={session.id}>
+      <div
+        className={clsx(styles.chat, {
+          [styles["chat-new-ui"]]: newUi,
+        })}
+        key={session.id}
+      >
         <div className="window-header" data-tauri-drag-region>
           {isMobileScreen && (
             <div className="window-actions">
@@ -1967,7 +1995,7 @@ function _Chat() {
                 }}
               />
             </div>
-            {showMaxIcon && (
+            {showMaxIcon && !newUi && (
               <div className="window-action-button">
                 <IconButton
                   icon={config.tightBorder ? <MinIcon /> : <MaxIcon />}
@@ -2208,7 +2236,9 @@ function _Chat() {
                               defaultShow={i >= messages.length - 6}
                             />
                             {getMessageImages(message).length == 1 && (
-                              <div className={styles["chat-message-image-wrapper"]}>
+                              <div
+                                className={styles["chat-message-image-wrapper"]}
+                              >
                                 <img
                                   className={styles["chat-message-item-image"]}
                                   src={getMessageImages(message)[0]}
@@ -2216,7 +2246,9 @@ function _Chat() {
                                 />
                                 <button
                                   type="button"
-                                  className={styles["chat-message-image-download"]}
+                                  className={
+                                    styles["chat-message-image-download"]
+                                  }
                                   onClick={() =>
                                     downloadMessageImage(
                                       getMessageImages(message)[0],
@@ -2260,7 +2292,9 @@ function _Chat() {
                                         <button
                                           type="button"
                                           className={
-                                            styles["chat-message-image-download"]
+                                            styles[
+                                              "chat-message-image-download"
+                                            ]
                                           }
                                           onClick={() =>
                                             downloadMessageImage(image, index)
@@ -2300,85 +2334,87 @@ function _Chat() {
                 onPromptSelect={onPromptSelect}
               />
 
-              <ChatActions
-                uploadImage={uploadImage}
-                setAttachImages={setAttachImages}
-                setUploading={setUploading}
-                showPromptModal={() => setShowPromptModal(true)}
-                scrollToBottom={scrollToBottom}
-                hitBottom={hitBottom}
-                uploading={uploading}
-                showPromptHints={() => {
-                  // Click again to close
-                  if (promptHints.length > 0) {
-                    setPromptHints([]);
-                    return;
-                  }
+              <ChatInputShell enabled={newUi}>
+                <ChatActions
+                  uploadImage={uploadImage}
+                  setAttachImages={setAttachImages}
+                  setUploading={setUploading}
+                  showPromptModal={() => setShowPromptModal(true)}
+                  scrollToBottom={scrollToBottom}
+                  hitBottom={hitBottom}
+                  uploading={uploading}
+                  showPromptHints={() => {
+                    // Click again to close
+                    if (promptHints.length > 0) {
+                      setPromptHints([]);
+                      return;
+                    }
 
-                  inputRef.current?.focus();
-                  setUserInput("/");
-                  onSearch("");
-                }}
-                setShowShortcutKeyModal={setShowShortcutKeyModal}
-                setUserInput={setUserInput}
-                setShowChatSidePanel={setShowChatSidePanel}
-              />
-              <label
-                className={clsx(styles["chat-input-panel-inner"], {
-                  [styles["chat-input-panel-inner-attach"]]:
-                    attachImages.length !== 0,
-                })}
-                htmlFor="chat-input"
-              >
-                <textarea
-                  id="chat-input"
-                  ref={inputRef}
-                  className={styles["chat-input"]}
-                  placeholder={Locale.Chat.Input(submitKey)}
-                  onInput={(e) => onInput(e.currentTarget.value)}
-                  value={userInput}
-                  onKeyDown={onInputKeyDown}
-                  onFocus={scrollToBottom}
-                  onClick={scrollToBottom}
-                  onPaste={handlePaste}
-                  rows={inputRows}
-                  autoFocus={autoFocus}
-                  style={{
-                    fontSize: config.fontSize,
-                    fontFamily: config.fontFamily,
+                    inputRef.current?.focus();
+                    setUserInput("/");
+                    onSearch("");
                   }}
+                  setShowShortcutKeyModal={setShowShortcutKeyModal}
+                  setUserInput={setUserInput}
+                  setShowChatSidePanel={setShowChatSidePanel}
                 />
-                {attachImages.length != 0 && (
-                  <div className={styles["attach-images"]}>
-                    {attachImages.map((image, index) => {
-                      return (
-                        <div
-                          key={index}
-                          className={styles["attach-image"]}
-                          style={{ backgroundImage: `url("${image}")` }}
-                        >
-                          <div className={styles["attach-image-mask"]}>
-                            <DeleteImageButton
-                              deleteImage={() => {
-                                setAttachImages(
-                                  attachImages.filter((_, i) => i !== index),
-                                );
-                              }}
-                            />
+                <label
+                  className={clsx(styles["chat-input-panel-inner"], {
+                    [styles["chat-input-panel-inner-attach"]]:
+                      attachImages.length !== 0,
+                  })}
+                  htmlFor="chat-input"
+                >
+                  <textarea
+                    id="chat-input"
+                    ref={inputRef}
+                    className={styles["chat-input"]}
+                    placeholder={Locale.Chat.Input(submitKey)}
+                    onInput={(e) => onInput(e.currentTarget.value)}
+                    value={userInput}
+                    onKeyDown={onInputKeyDown}
+                    onFocus={scrollToBottom}
+                    onClick={scrollToBottom}
+                    onPaste={handlePaste}
+                    rows={inputRows}
+                    autoFocus={autoFocus}
+                    style={{
+                      fontSize: config.fontSize,
+                      fontFamily: config.fontFamily,
+                    }}
+                  />
+                  {attachImages.length != 0 && (
+                    <div className={styles["attach-images"]}>
+                      {attachImages.map((image, index) => {
+                        return (
+                          <div
+                            key={index}
+                            className={styles["attach-image"]}
+                            style={{ backgroundImage: `url("${image}")` }}
+                          >
+                            <div className={styles["attach-image-mask"]}>
+                              <DeleteImageButton
+                                deleteImage={() => {
+                                  setAttachImages(
+                                    attachImages.filter((_, i) => i !== index),
+                                  );
+                                }}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <IconButton
-                  icon={<SendWhiteIcon />}
-                  text={Locale.Chat.Send}
-                  className={styles["chat-input-send"]}
-                  type="primary"
-                  onClick={() => doSubmit(userInput)}
-                />
-              </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <IconButton
+                    icon={<SendWhiteIcon />}
+                    text={Locale.Chat.Send}
+                    className={styles["chat-input-send"]}
+                    type="primary"
+                    onClick={() => doSubmit(userInput)}
+                  />
+                </label>
+              </ChatInputShell>
             </div>
           </div>
           <div

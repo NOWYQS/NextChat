@@ -15,6 +15,7 @@ import {
   ServiceProvider,
 } from "../constant";
 import { createPersistStore } from "../utils/store";
+import { NEW_UI_DEFAULT_ENABLED } from "../utils/new-ui";
 import type { Voice } from "rt-client";
 import { normalizeReasoningEffort, ReasoningEffort } from "../utils/reasoning";
 
@@ -48,6 +49,7 @@ export const DEFAULT_CONFIG = {
   fontFamily: "",
   theme: Theme.Auto as Theme,
   tightBorder: !!config?.isApp,
+  enableNewUi: NEW_UI_DEFAULT_ENABLED,
   sendPreviewBubble: true,
   enableAutoGenerateTitle: true,
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
@@ -201,7 +203,7 @@ export const useAppConfig = createPersistStore(
   }),
   {
     name: StoreKey.Config,
-    version: 4.3,
+    version: 4.4,
 
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
@@ -269,6 +271,10 @@ export const useAppConfig = createPersistStore(
       if (version < 4.3) {
         state.modelConfig.enableImageGeneration =
           DEFAULT_CONFIG.modelConfig.enableImageGeneration;
+      }
+
+      if (version < 4.4) {
+        state.enableNewUi = DEFAULT_CONFIG.enableNewUi;
       }
 
       return state as any;

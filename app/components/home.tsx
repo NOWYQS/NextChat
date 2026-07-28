@@ -8,7 +8,8 @@ import styles from "./home.module.scss";
 import BotIcon from "../icons/bot.svg";
 import LoadingIcon from "../icons/three-dots.svg";
 
-import { getCSSVar, useMobileScreen } from "../utils";
+import { getCSSVar, useMobileScreen, useWindowSize } from "../utils";
+import { resolveNewUiMode } from "../utils/new-ui";
 
 import dynamic from "next/dynamic";
 import { Path, SlotID } from "../constant";
@@ -167,8 +168,16 @@ function Screen() {
   const isSdNew = location.pathname === Path.SdNew;
 
   const isMobileScreen = useMobileScreen();
-  const shouldTightBorder =
-    getClientConfig()?.isApp || (config.tightBorder && !isMobileScreen);
+  const { width } = useWindowSize();
+  const isApp = !!getClientConfig()?.isApp;
+  const routeEligible = !isArtifact && !isAuth && !isSd && !isSdNew;
+  const useNewUi = resolveNewUiMode({
+    enabled: config.enableNewUi,
+    width,
+    isApp,
+    routeEligible,
+  });
+  const shouldTightBorder = isApp || (config.tightBorder && !isMobileScreen);
 
   useEffect(() => {
     loadAsyncGoogleFont();
@@ -188,6 +197,7 @@ function Screen() {
     return (
       <>
         <SideBar
+          newUi={useNewUi}
           className={clsx({
             [styles["sidebar-show"]]: isHome,
           })}
@@ -210,8 +220,10 @@ function Screen() {
 
   return (
     <div
+      data-layout={useNewUi ? "new-ui" : "classic"}
       className={clsx(styles.container, {
         [styles["tight-container"]]: shouldTightBorder,
+        [styles["new-ui-container"]]: useNewUi,
         [styles["rtl-screen"]]: getLang() === "ar",
       })}
     >

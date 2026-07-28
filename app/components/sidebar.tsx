@@ -12,6 +12,7 @@ import MaskIcon from "../icons/mask.svg";
 import McpIcon from "../icons/mcp.svg";
 import DragIcon from "../icons/drag.svg";
 import DiscoveryIcon from "../icons/discovery.svg";
+import SearchIcon from "../icons/zoom.svg";
 
 import Locale from "../locales";
 
@@ -224,7 +225,7 @@ export function SideBarTail(props: {
   );
 }
 
-export function SideBar(props: { className?: string }) {
+export function SideBar(props: { className?: string; newUi?: boolean }) {
   useHotKey();
   const { onDragStart, shouldNarrow } = useDragSideBar();
   const [showDiscoverySelector, setshowDiscoverySelector] = useState(false);
@@ -232,6 +233,15 @@ export function SideBar(props: { className?: string }) {
   const config = useAppConfig();
   const chatStore = useChatStore();
   const [mcpEnabled, setMcpEnabled] = useState(false);
+
+  const openNewChat = () => {
+    if (config.dontShowMaskSplashScreen) {
+      chatStore.newSession();
+      navigate(Path.Chat);
+    } else {
+      navigate(Path.NewChat);
+    }
+  };
 
   useEffect(() => {
     // 检查 MCP 是否启用
@@ -255,6 +265,21 @@ export function SideBar(props: { className?: string }) {
         logo={<ChatGptIcon />}
         shouldNarrow={shouldNarrow}
       >
+        {props.newUi && (
+          <div className={styles["new-ui-primary-actions"]}>
+            <IconButton
+              icon={<AddIcon />}
+              text={shouldNarrow ? undefined : Locale.Home.NewChat}
+              aria={Locale.Home.NewChat}
+              onClick={openNewChat}
+            />
+            <IconButton
+              icon={<SearchIcon />}
+              aria={Locale.SearchChat.Page.Title}
+              onClick={() => navigate(Path.SearchChat)}
+            />
+          </div>
+        )}
         <div className={styles["sidebar-header-bar"]}>
           <IconButton
             icon={<MaskIcon />}
@@ -348,19 +373,14 @@ export function SideBar(props: { className?: string }) {
           </>
         }
         secondaryAction={
-          <IconButton
-            icon={<AddIcon />}
-            text={shouldNarrow ? undefined : Locale.Home.NewChat}
-            onClick={() => {
-              if (config.dontShowMaskSplashScreen) {
-                chatStore.newSession();
-                navigate(Path.Chat);
-              } else {
-                navigate(Path.NewChat);
-              }
-            }}
-            shadow
-          />
+          !props.newUi && (
+            <IconButton
+              icon={<AddIcon />}
+              text={shouldNarrow ? undefined : Locale.Home.NewChat}
+              onClick={openNewChat}
+              shadow
+            />
+          )
         }
       />
     </SideBarContainer>

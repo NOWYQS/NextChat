@@ -223,6 +223,11 @@ const en: LocaleType = {
     },
     SendKey: "Send Key",
     Theme: "Theme",
+    NewUI: {
+      Title: "New UI (Desktop)",
+      SubTitle:
+        "Use the full-screen layout on wide web browsers; smaller screens keep the classic UI",
+    },
     TightBorder: "Tight Border",
     SendPreviewBubble: {
       Title: "Send Preview Bubble",

@@ -221,6 +221,10 @@ const cn = {
     },
     SendKey: "发送键",
     Theme: "主题",
+    NewUI: {
+      Title: "New UI（桌面端）",
+      SubTitle: "启用更适合宽屏浏览器的全屏布局；小屏设备仍使用经典界面",
+    },
     TightBorder: "无边框模式",
     SendPreviewBubble: {
       Title: "预览气泡",
